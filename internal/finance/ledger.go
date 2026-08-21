@@ -47,6 +47,19 @@ func (l *Ledger) Post(e Entry) error {
 	l.entries = append(l.entries, e)
 	return nil
 }
+
+func (l *Ledger) PostBatch(entries []Entry) error {
+	if len(entries) == 0 {
+		return domain.ErrInvalid
+	}
+	for index, entry := range entries {
+		if err := l.Post(entry); err != nil {
+			return fmt.Errorf("post ledger batch entry %d: %w", index, err)
+		}
+	}
+	return nil
+}
+
 func (l *Ledger) Balance(tenant string) int64 {
 	l.mu.RLock()
 	defer l.mu.RUnlock()

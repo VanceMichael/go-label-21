@@ -2,6 +2,7 @@ package reconciliation
 
 import (
 	"github.com/VanceMichael/go-base-airbridge/internal/domain"
+	"github.com/VanceMichael/go-base-airbridge/internal/finance"
 	"sort"
 	"time"
 )
@@ -18,6 +19,29 @@ type Difference struct {
 	Reason     string
 	Local      *Entry
 	Remote     *Entry
+}
+
+func ApplySettlement(ledger *finance.Ledger, tenantID, shipmentID, currency string, lines []Entry) error {
+	if ledger == nil || tenantID == "" || shipmentID == "" || currency == "" || len(lines) == 0 {
+		return domain.ErrInvalid
+	}
+	postings := make([]finance.Entry, 0, len(lines))
+	for _, line := range lines {
+		if err := Validate(line); err != nil || line.Amount <= 0 {
+			return domain.ErrInvalid
+		}
+		posting := finance.Entry{ID: line.ExternalID, TenantID: tenantID, ShipmentID: shipmentID, Currency: currency, PostedAt: line.OccurredAt}
+		switch line.Kind {
+		case "debit":
+			posting.Debit = line.Amount
+		case "credit":
+			posting.Credit = line.Amount
+		default:
+			return domain.ErrInvalid
+		}
+		postings = append(postings, posting)
+	}
+	return ledger.PostBatch(postings)
 }
 
 func Compare(local, remote []Entry) []Difference {
